@@ -18,6 +18,7 @@ import TimerScreen from '../screens/TimerScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import AddContactScreen from '../screens/AddContactScreen';
+import MedicalProfileFormScreen from '../screens/MedicalProfileFormScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -31,7 +32,7 @@ function MainTabs() {
           let iconName;
           if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
           else if (route.name === 'Contacts') iconName = focused ? 'account-group' : 'account-group-outline';
-          else if (route.name === 'Profile') iconName = focused ? 'medical-bag' : 'medical-bag-outline';
+          else if (route.name === 'Profile') iconName = focused ? 'medical-bag' : 'medical-bag';
           else if (route.name === 'Settings') iconName = focused ? 'cog' : 'cog-outline';
           return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
         },
@@ -50,7 +51,7 @@ function MainTabs() {
 }
 
 export default function RootNavigator() {
-  const { isAuthenticated } = useApp();
+  const { isAuthenticated, hasMedicalProfile } = useApp();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -72,11 +73,17 @@ export default function RootNavigator() {
         </>
       ) : (
         <>
-          <Stack.Screen name="Main" component={MainTabs} />
-          <Stack.Screen name="Emergency" component={EmergencyScreen} />
-          <Stack.Screen name="AddContact" component={AddContactScreen} />
-          <Stack.Screen name="Timer" component={TimerScreen} />
-          <Stack.Screen name="History" component={HistoryScreen} />
+          {!hasMedicalProfile ? (
+            <Stack.Screen name="MedicalProfileForm" component={MedicalProfileFormScreen} />
+          ) : (
+            <>
+              <Stack.Screen name="Main" component={MainTabs} />
+              <Stack.Screen name="Emergency" component={EmergencyScreen} />
+              <Stack.Screen name="AddContact" component={AddContactScreen} />
+              <Stack.Screen name="Timer" component={TimerScreen} />
+              <Stack.Screen name="History" component={HistoryScreen} />
+            </>
+          )}
         </>
       )}
     </Stack.Navigator>

@@ -1,18 +1,90 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Animated } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, Animated, Alert, ActivityIndicator } from 'react-native';
 import { Text, useTheme, TextInput, Button, Card, IconButton, Divider, Surface } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useApp } from '../store/AppContext';
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const { userData } = useApp();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
   const [profile, setProfile] = useState({
-    name: 'John Smith',
-    bloodGroup: 'B+',
-    allergies: 'Peanuts, Penicillin',
-    conditions: 'Asthma',
-    notes: 'Inhaler is in the front pocket of my backpack.',
+    name: userData?.full_name || '',
+    bloodGroup: '',
+    allergies: '',
+    conditions: '',
+    medications: '',
+    notes: '',
   });
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch('http://192.168.1.10:5000/profile', {
+        headers: { 'x-user-id': userData?.id?.toString() || '' }
+      });
+      const data = await response.json();
+      if (response.ok && data) {
+        setProfile({
+          name: data.personal?.full_name || '',
+          bloodGroup: data.medical?.blood_group || '',
+          allergies: data.medical?.allergies || '',
+          conditions: data.medical?.medical_conditions || '',
+          medications: data.medical?.medications || '',
+          notes: data.medical?.emergency_notes || ''
+        });
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    setIsSaving(true);
+    try {
+      // Assuming you only want to save medical data from this screen according to requirement
+      const response = await fetch('http://192.168.1.10:5000/profile/medical', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': userData?.id?.toString() || '' 
+        },
+        body: JSON.stringify({
+          blood_group: profile.bloodGroup,
+          allergies: profile.allergies,
+          medical_conditions: profile.conditions,
+          medications: profile.medications,
+          emergency_notes: profile.notes
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update profile");
+      }
+      Alert.alert("Success", "Profile updated successfully!");
+    } catch (error) {
+      Alert.alert("Error", error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -36,12 +108,12 @@ export default function ProfileScreen() {
               </View>
               <View style={styles.previewItem}>
                 <Text variant="labelSmall" style={styles.previewLabel}>BLOOD GROUP</Text>
-                <Text variant="headlineSmall" style={styles.previewText}>{profile.bloodGroup}</Text>
+                <Text variant="headlineSmall" style={styles.previewText}>{profile.bloodGroup || 'N/A'}</Text>
               </View>
             </View>
             <View style={styles.previewItem}>
               <Text variant="labelSmall" style={styles.previewLabel}>ALLERGIES</Text>
-              <Text variant="bodyMedium" style={styles.previewText}>{profile.allergies}</Text>
+              <Text variant="bodyMedium" style={styles.previewText}>{profile.allergies || 'None'}</Text>
             </View>
           </View>
         </Surface>
@@ -53,6 +125,7 @@ export default function ProfileScreen() {
             onChangeText={(text) => setProfile({ ...profile, name: text })}
             mode="outlined"
             style={styles.input}
+            disabled // Not updating user's personal details down this route per design
           />
           <TextInput
             label="Blood Group"
@@ -78,6 +151,14 @@ export default function ProfileScreen() {
             style={styles.input}
           />
           <TextInput
+            label="Medications"
+            value={profile.medications}
+            onChangeText={(text) => setProfile({ ...profile, medications: text })}
+            mode="outlined"
+            multiline={true}
+            style={styles.input}
+          />
+          <TextInput
             label="Emergency Notes"
             value={profile.notes}
             onChangeText={(text) => setProfile({ ...profile, notes: text })}
@@ -90,7 +171,9 @@ export default function ProfileScreen() {
 
         <Button
           mode="contained"
-          onPress={() => {}}
+          onPress={handleUpdate}
+          loading={isSaving}
+          disabled={isSaving}
           style={styles.saveButton}
           labelStyle={styles.saveButtonLabel}
           icon="check-circle"

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Alert } from 'react-native';
 import { Text, useTheme, TextInput, Button, Checkbox } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,13 +10,45 @@ export default function RegisterScreen({ navigation }) {
   const { login } = useApp();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleRegister = () => {
-    // In a real app, create account and authenticate here
-    login();
+  const handleRegister = async () => {
+    if (!name || !email || !phone || !password) {
+      Alert.alert("Error", "Please fill in all fields.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      console.log(`[Register API] Attempting fetch to http://192.168.1.10:5000/auth/register`);
+      const response = await fetch('http://192.168.1.10:5000/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ full_name: name, email: email.trim(), phone, password })
+      });
+
+      console.log(`[Register API] HTTP Response Status:`, response.status);
+      const data = await response.json();
+      console.log(`[Register API] Parsed JSON Data:`, data);
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || data.error || "Registration failed");
+      }
+
+      console.log(`[Register API] Success! Triggering AppContext login().`);
+      // Since our backend returns { success, user: { id, full_name, email, phone }, hasMedicalProfile }
+      await login(data.user, data.hasMedicalProfile);
+      
+    } catch (error) {
+      console.error(`[Register API] Exception Caught:`, error);
+      Alert.alert("Registration Failed", error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -62,6 +94,20 @@ export default function RegisterScreen({ navigation }) {
             </View>
 
             <View style={styles.inputContainer}>
+              <Text variant="labelMedium" style={styles.inputLabel}>PHONE NUMBER</Text>
+              <TextInput
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="+1 234 567 8900"
+                mode="outlined"
+                keyboardType="phone-pad"
+                style={styles.input}
+                outlineStyle={styles.inputOutline}
+                left={<TextInput.Icon icon="phone-outline" color={theme.colors.outline} />}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
               <Text variant="labelMedium" style={styles.inputLabel}>PASSWORD</Text>
               <TextInput
                 value={password}
@@ -98,11 +144,12 @@ export default function RegisterScreen({ navigation }) {
             <Button
               mode="contained"
               onPress={handleRegister}
+              loading={isLoading}
               style={[styles.registerButton, { backgroundColor: theme.colors.primary }]}
               contentStyle={[styles.registerButtonContent, { flexDirection: 'row-reverse' }]}
               labelStyle={styles.registerButtonLabel}
               icon="arrow-right"
-              disabled={!agreed}
+              disabled={!agreed || isLoading}
             >
               Create Account
             </Button>

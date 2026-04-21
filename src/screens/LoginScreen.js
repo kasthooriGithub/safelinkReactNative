@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Alert } from 'react-native';
 import { Text, useTheme, TextInput, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,10 +11,41 @@ export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    // In a real app, authenticate here
-    login();
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please fill in all fields.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      console.log(`[Login API] Attempting fetch to http://192.168.1.10:5000/auth/login`);
+      const response = await fetch('http://192.168.1.10:5000/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password })
+      });
+
+      console.log(`[Login API] HTTP Response Status:`, response.status);
+      const data = await response.json();
+      console.log(`[Login API] Parsed JSON Data:`, data);
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || data.error || "Login failed");
+      }
+
+      console.log(`[Login API] Success! Triggering AppContext login().`);
+      // Pass the user and medical status into Context and AsyncStorage.
+      await login(data.user, data.hasMedicalProfile);
+      
+    } catch (error) {
+      console.error(`[Login API] Exception Caught:`, error);
+      Alert.alert("Login Failed", error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -81,6 +112,8 @@ export default function LoginScreen({ navigation }) {
             <Button
               mode="contained"
               onPress={handleLogin}
+              loading={isLoading}
+              disabled={isLoading}
               style={[styles.loginButton, { backgroundColor: theme.colors.primary }]}
               contentStyle={[styles.loginButtonContent, { flexDirection: 'row-reverse' }]}
               labelStyle={styles.loginButtonLabel}
